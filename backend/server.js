@@ -1,42 +1,69 @@
-io.on('connection', (socket) => {
+const express = require('express');
+const app = express();
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
 
-  socket.on('join', ({ roomId, username }) => {
-    userSocketMap[socket.id] = username;
-    socket.join(roomId);
+app.use(cors());
+const server = http.createServer(app);
 
-    const room = io.sockets.adapter.rooms.get(roomId);
-    const clients = room
-      ? Array.from(room).map((sId) => ({
-          socketId: sId,
-          username: userSocketMap[sId]
-        }))
-      : [];
+const io = new Server(server, {
+    cors: { origin: "*", methods: ["GET", "POST"] }
+});
 
-    clients.forEach(({ socketId }) => {
-      io.to(socketId).emit('joined', {
-        clients,
-        username,
-        socketId: socket.id
-      });
-    });
-  });
+const userSocketMap = {};
 
-  socket.on('code-change', ({ roomId, code }) => {
-    socket.to(roomId).emit('code-change', { code });
-  });
-
-  socket.on('disconnecting', () => {
-    const rooms = [...socket.rooms].filter(
-      (roomId) => roomId !== socket.id
+function getAllConnectedClients(roomId) {
+    return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
+        (socketId) => {
+            return {
+                socketId,
+                username: userSocketMap[socketId],
+            };
+        }
     );
+}
 
-    rooms.forEach((roomId) => {
-      socket.to(roomId).emit('disconnected', {
-        socketId: socket.id,
-        username: userSocketMap[socket.id]
-      });
+io.on('connection', (socket) => {
+    console.log('🟢 Naya user connect hua! Socket ID:', socket.id);
+
+    socket.on('join', ({ roomId, username }) => {
+        userSocketMap[socket.id] = username;
+        socket.join(roomId);
+        const clients = getAllConnectedClients(roomId);
+        
+        clients.forEach(({ socketId }) => {
+            io.to(socketId).emit('joined', {
+                clients,
+                username,
+                socketId: socket.id,
+            });
+        });
     });
 
-    delete userSocketMap[socket.id];
-  });
+    // --- YE WALA PART ADD KARO ---
+    socket.on('code-change', ({ roomId, code }) => {
+        socket.in(roomId).emit('code-change', { code });
+    });
+    // ----------------------------
+
+    socket.on('disconnecting', () => {
+        const rooms = [...socket.rooms];
+        rooms.forEach((roomId) => {
+            socket.in(roomId).emit('disconnected', {
+                socketId: socket.id,
+                username: userSocketMap[socket.id],
+            });
+        });
+        delete userSocketMap[socket.id];
+    });
+
+    socket.on('disconnect', () => {
+        console.log('🔴 User disconnect ho gaya!');
+    });
+});
+
+const PORT = process.env.PORT || 5001; // Render automatically PORT provide karta hai
+server.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
 });
