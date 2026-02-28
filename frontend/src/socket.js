@@ -5,10 +5,10 @@ export const initSocket = async () => {
         'force new connection': true,
         reconnectionAttempt: 'Infinity',
         timeout: 10000,
-        transports: ['websocket'],
+        // ZARURI FIX: 'polling' transport bhi add kiya hai safety ke liye
+        transports: ['websocket', 'polling'], 
     };
     
-    // Dhyan de: Agar aapne server.js mein port 5001 kiya tha, toh yahan bhi 5001 hi likhna hai.
-    // Agar 4000 kiya tha, toh 4000 likhna.
+    // Render URL bina kisi port (:5001) ke, kyunki Render https port khud handle karta hai
     return io('https://collaborative-editor-backend-d8lj.onrender.com', options);
 };

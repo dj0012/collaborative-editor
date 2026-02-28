@@ -4,16 +4,19 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
-// Render ke liye CORS configuration
+// CORS setup for Express
 app.use(cors());
 
 const server = http.createServer(app);
 
+// ZARURI FIX: Socket.io CORS ko aur specify kiya hai
 const io = new Server(server, {
     cors: { 
-        origin: "*", 
-        methods: ["GET", "POST"] 
-    }
+        origin: "*", // Sabhi frontend links allow karne ke liye
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'] // Polling support bhi add kiya hai safety ke liye
 });
 
 const userSocketMap = {};
@@ -66,7 +69,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// ZARURI FIX: Comment hata diya hai aur Render ke liye dynamic PORT set hai
+// Port configuration for Render
 const PORT = process.env.PORT || 5001; 
 server.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
