@@ -5,44 +5,27 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 
 app.use(cors());
-
 const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: { 
-        // Yahan aapka exact frontend URL hai
-        origin: "https://collaborative-editor-nine-weld.vercel.app", 
-        methods: ["GET", "POST"],
-        credentials: true
+        origin: "*", 
+        methods: ["GET", "POST"] 
     },
     transports: ['websocket', 'polling']
 });
 
 const userSocketMap = {};
 
-function getAllConnectedClients(roomId) {
-    return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
-        (socketId) => {
-            return {
-                socketId,
-                username: userSocketMap[socketId],
-            };
-        }
-    );
-}
-
 io.on('connection', (socket) => {
     socket.on('join', ({ roomId, username }) => {
         userSocketMap[socket.id] = username;
         socket.join(roomId);
-        const clients = getAllConnectedClients(roomId);
-        
+        const clients = Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
+            (socketId) => ({ socketId, username: userSocketMap[socketId] })
+        );
         clients.forEach(({ socketId }) => {
-            io.to(socketId).emit('joined', {
-                clients,
-                username,
-                socketId: socket.id,
-            });
+            io.to(socketId).emit('joined', { clients, username, socketId: socket.id });
         });
     });
 
@@ -62,7 +45,5 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 10000; 
-server.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
