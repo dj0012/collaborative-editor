@@ -4,19 +4,18 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
-// CORS setup for Express
 app.use(cors());
 
 const server = http.createServer(app);
 
-// ZARURI FIX: Socket.io CORS ko aur specify kiya hai
 const io = new Server(server, {
     cors: { 
-        origin: "*", // Sabhi frontend links allow karne ke liye
+        // Yahan aapka exact frontend URL hai
+        origin: "https://collaborative-editor-nine-weld.vercel.app", 
         methods: ["GET", "POST"],
         credentials: true
     },
-    transports: ['websocket', 'polling'] // Polling support bhi add kiya hai safety ke liye
+    transports: ['websocket', 'polling']
 });
 
 const userSocketMap = {};
@@ -33,8 +32,6 @@ function getAllConnectedClients(roomId) {
 }
 
 io.on('connection', (socket) => {
-    console.log('🟢 Naya user connect hua! Socket ID:', socket.id);
-
     socket.on('join', ({ roomId, username }) => {
         userSocketMap[socket.id] = username;
         socket.join(roomId);
@@ -63,14 +60,9 @@ io.on('connection', (socket) => {
         });
         delete userSocketMap[socket.id];
     });
-
-    socket.on('disconnect', () => {
-        console.log('🔴 User disconnect ho gaya!');
-    });
 });
 
-// Port configuration for Render
-const PORT = process.env.PORT || 5001; 
+const PORT = process.env.PORT || 10000; 
 server.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
 });
