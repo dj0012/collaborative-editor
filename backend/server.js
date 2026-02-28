@@ -4,11 +4,16 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
+// Render ke liye CORS configuration
 app.use(cors());
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
+    cors: { 
+        origin: "*", 
+        methods: ["GET", "POST"] 
+    }
 });
 
 const userSocketMap = {};
@@ -41,11 +46,9 @@ io.on('connection', (socket) => {
         });
     });
 
-    // --- YE WALA PART ADD KARO ---
     socket.on('code-change', ({ roomId, code }) => {
         socket.in(roomId).emit('code-change', { code });
     });
-    // ----------------------------
 
     socket.on('disconnecting', () => {
         const rooms = [...socket.rooms];
@@ -63,7 +66,8 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 5001; // Render automatically PORT provide karta hai
-// server.listen(PORT, () => {
-//     console.log(`🚀 Server is running on port ${PORT}`);
-// });
+// ZARURI FIX: Comment hata diya hai aur Render ke liye dynamic PORT set hai
+const PORT = process.env.PORT || 5001; 
+server.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+});
