@@ -5,10 +5,9 @@ export const initSocket = async () => {
         'force new connection': true,
         reconnectionAttempt: 'Infinity',
         timeout: 10000,
-        transports: ['websocket'],
+        transports: ['websocket', 'polling'], // Production mein 'polling' fallback zaruri hai
     };
     
-    // Dhyan de: Agar aapne server.js mein port 5001 kiya tha, toh yahan bhi 5001 hi likhna hai.
-    // Agar 4000 kiya tha, toh 4000 likhna.
-    return io('http://localhost:5001', options);
+    // Live Render Backend ka URL
+    return io('https://collaborative-editor-backend-d8lj.onrender.com', options);
 };
