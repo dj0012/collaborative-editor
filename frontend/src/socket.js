@@ -5,10 +5,10 @@ export const initSocket = async () => {
         'force new connection': true,
         reconnectionAttempt: 'Infinity',
         timeout: 10000,
-        // ZARURI FIX: 'polling' transport bhi add kiya hai safety ke liye
+        // Dono transports allow kiye hain taaki firewall block na kare
         transports: ['websocket', 'polling'], 
     };
     
-    // Render URL bina kisi port (:5001) ke, kyunki Render https port khud handle karta hai
+    // Render URL bina kisi port ke (Kyunki production mein port 443 use hota hai)
     return io('https://collaborative-editor-backend-d8lj.onrender.com', options);
 };
