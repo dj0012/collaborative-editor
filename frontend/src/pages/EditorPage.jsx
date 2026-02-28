@@ -15,21 +15,23 @@ const EditorPage = () => {
     const [clients, setClients] = useState([]);
     const [output, setOutput] = useState("");
     const [loading, setLoading] = useState(false);
-    
-    // --- Naya State: Language ID ke liye ---
-    const [languageId, setLanguageId] = useState("63"); // Default Node.js
+    const [isClient, setIsClient] = useState(false); // Hydration fix ke liye
+
+    const [languageId, setLanguageId] = useState("63");
     const [languageName, setLanguageName] = useState("javascript");
+
+    // --- FIX 1: Hydration Check ---
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const handleEditorDidMount = (editor) => {
         editorRef.current = editor;
     };
 
-    // Language change hone par editor ki language update karne ke liye
     const onLanguageChange = (e) => {
         const id = e.target.value;
         setLanguageId(id);
-        
-        // Monaco editor ko batana ki kaunsi language use karni hai
         if (id === "63") setLanguageName("javascript");
         else if (id === "71") setLanguageName("python");
         else if (id === "54") setLanguageName("cpp");
@@ -37,9 +39,9 @@ const EditorPage = () => {
     };
 
     const runCode = async () => {
+        if (!editorRef.current) return;
         setLoading(true);
         setOutput("Compiling...");
-        
         const code = editorRef.current.getValue();
         
         const options = {
@@ -51,16 +53,12 @@ const EditorPage = () => {
                 'X-RapidAPI-Key': '2f9eabe440msh957c622a34976d7p13644fjsn7c6fad455dc8', 
                 'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
             },
-            data: {
-                language_id: languageId, // Ab ye dynamic hai!
-                source_code: code,
-            }
+            data: { language_id: languageId, source_code: code }
         };
 
         try {
             const response = await axios.request(options);
-            const token = response.data.token;
-            checkStatus(token);
+            checkStatus(response.data.token);
         } catch (error) {
             setLoading(false);
             setOutput("Error: " + error.message);
@@ -80,9 +78,7 @@ const EditorPage = () => {
 
         try {
             const response = await axios.request(options);
-            const statusId = response.data.status?.id;
-
-            if (statusId === 1 || statusId === 2) {
+            if (response.data.status?.id <= 2) {
                 setTimeout(() => checkStatus(token), 2000);
             } else {
                 setLoading(false);
@@ -97,15 +93,18 @@ const EditorPage = () => {
     const copyRoomId = async () => {
         try {
             await navigator.clipboard.writeText(roomId);
-            toast.success('Room ID has been copied to your clipboard');
+            toast.success('Room ID copied!');
         } catch (err) {
-            toast.error('Could not copy the Room ID');
+            toast.error('Could not copy Room ID');
         }
     };
 
     useEffect(() => {
         const init = async () => {
-            socketRef.current = await initSocket();
+            // FIX 2: Socket instance tabhi banayein jab client ready ho
+            if (!socketRef.current) {
+                socketRef.current = await initSocket();
+            }
             
             socketRef.current.on('connect_error', (err) => handleErrors(err));
             socketRef.current.on('connect_failed', (err) => handleErrors(err));
@@ -123,10 +122,12 @@ const EditorPage = () => {
             socketRef.current.on('joined', ({ clients, username }) => {
                 if (username !== location.state?.username) {
                     toast.success(`${username} joined.`);
-                    socketRef.current.emit('code-change', {
-                        roomId,
-                        code: editorRef.current?.getValue(),
-                    });
+                    if (editorRef.current) {
+                        socketRef.current.emit('code-change', {
+                            roomId,
+                            code: editorRef.current.getValue(),
+                        });
+                    }
                 }
                 setClients(clients);
             });
@@ -145,15 +146,26 @@ const EditorPage = () => {
             });
         };
         
-        if (location.state) { init(); }
-        return () => { if(socketRef.current) socketRef.current.disconnect(); }
-    }, [location.state, navigate, roomId]);
+        if (location.state && isClient) { 
+            init(); 
+        }
+        
+        return () => { 
+            if(socketRef.current) {
+                socketRef.current.disconnect(); 
+                socketRef.current.off('joined');
+                socketRef.current.off('code-change');
+                socketRef.current.off('disconnected');
+            }
+        }
+    }, [isClient, location.state, navigate, roomId]);
 
+    // Render logic
+    if (!isClient) return null; // Server par render nahi hoga
     if (!location.state) return <Navigate to="/" />;
 
     return (
         <div style={{ display: 'flex', height: '100vh', color: '#fff', backgroundColor: '#1c1e29' }}>
-            {/* Sidebar */}
             <div style={{ width: '230px', backgroundColor: '#282a36', padding: '20px', display: 'flex', flexDirection: 'column' }}>
                 <h3>Connected</h3>
                 <div style={{ flex: 1, marginTop: '20px' }}>
@@ -167,53 +179,34 @@ const EditorPage = () => {
                 <button onClick={() => navigate('/')} style={{ padding: '10px', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>Leave</button>
             </div>
 
-            {/* Main Editor Section */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                {/* Header with Language Selector and Run Button */}
                 <div style={{ padding: '10px', background: '#1c1e29', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                    
-                    {/* Dropdown Menu */}
-                    <select 
-                        value={languageId} 
-                        onChange={onLanguageChange}
-                        style={{ 
-                            marginRight: '15px', 
-                            padding: '8px', 
-                            borderRadius: '5px', 
-                            background: '#282a36', 
-                            color: '#fff', 
-                            border: '1px solid #4aee88',
-                            cursor: 'pointer'
-                        }}
-                    >
+                    <select value={languageId} onChange={onLanguageChange} style={{ marginRight: '15px', padding: '8px', borderRadius: '5px', background: '#282a36', color: '#fff', border: '1px solid #4aee88', cursor: 'pointer' }}>
                         <option value="63">JavaScript (Node.js)</option>
                         <option value="71">Python (3.8.1)</option>
                         <option value="54">C++ (GCC 9.2.0)</option>
                         <option value="62">Java (OpenJDK 13.0.1)</option>
                     </select>
-
-                    <button 
-                        onClick={runCode} 
-                        disabled={loading}
-                        style={{ padding: '8px 25px', backgroundColor: '#4aee88', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}
-                    >
+                    <button onClick={runCode} disabled={loading} style={{ padding: '8px 25px', backgroundColor: '#4aee88', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>
                         {loading ? "Running..." : "RUN"}
                     </button>
                 </div>
                 
-                {/* Monaco Editor */}
                 <div style={{ flex: 1 }}>
                     <Editor
                         height="100%"
-                        language={languageName} // Dynamic Language
+                        language={languageName}
                         theme="vs-dark"
                         onMount={handleEditorDidMount}
-                        onChange={(val) => socketRef.current.emit('code-change', { roomId, code: val })}
+                        onChange={(val) => {
+                            if (socketRef.current) {
+                                socketRef.current.emit('code-change', { roomId, code: val });
+                            }
+                        }}
                         options={{ fontSize: 16, minimap: { enabled: false } }}
                     />
                 </div>
 
-                {/* Output Window */}
                 <div style={{ height: '150px', background: '#000', padding: '10px', borderTop: '2px solid #282a36', overflowY: 'auto' }}>
                     <h4 style={{ color: '#4aee88', marginBottom: '5px' }}>Output:</h4>
                     <pre style={{ fontSize: '14px', color: '#fff' }}>{output}</pre>
